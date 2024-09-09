@@ -4,14 +4,14 @@ import numpy as np
 import mne
 from types import SimpleNamespace
 
-from scipy.signal import spectrogram
+#from scipy.signal import spectrogram
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 
 import pickle
 
 # imprt notebook tqdm
-from tqdm.notebook import tqdm
+#from tqdm.notebook import tqdm
 
 from mne.time_frequency import tfr_multitaper
 
