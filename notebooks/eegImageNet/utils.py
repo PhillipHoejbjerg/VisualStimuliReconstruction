@@ -96,6 +96,10 @@ class EEGImageNetDataset(Dataset):
         else:
             loaded = torch.load(os.path.join(self.args.dataset_dir, "EEG-ImageNet_1.pth"))
 
+            # if file exists: os.path.join(self.args.dataset_dir, "EEG-ImageNet_2.pth")
+            if os.path.exists(os.path.join(self.args.dataset_dir, "EEG-ImageNet_2.pth")):
+                loaded['dataset'] += torch.load(os.path.join(self.args.dataset_dir, "EEG-ImageNet_2.pth"))['dataset']
+
         # Filter by subject
         if self.args.subject != -1:
             if isinstance(self.args.subject, int):
