@@ -42,7 +42,7 @@ class EEGImageNetDataset(Dataset):
         # Compute and save spectrograms if they don't exist
         if self.args.spectrograms and not os.path.exists(f'{self.args.spectrogram_dir}/spectrograms_nperseg_{self.args.nperseg}.pth'):
 
-            assert self.args.subject == -1, "Spectrograms can only be computed for all subjects"
+            assert self.args.subject == [-1], "Spectrograms can only be computed for all subjects"
 
             # Updates self.data
             self.compute_spectrograms()
@@ -101,7 +101,7 @@ class EEGImageNetDataset(Dataset):
                 loaded['dataset'] += torch.load(os.path.join(self.args.dataset_dir, "EEG-ImageNet_2.pth"))['dataset']
 
         # Filter by subject
-        if self.args.subject != -1:
+        if self.args.subject != [-1]:
             if isinstance(self.args.subject, int):
                 self.args.subject = [self.args.subject]
 
@@ -260,7 +260,7 @@ def get_loaders(args):
     # assert args.means and args.stds are NOT provided
     assert args.means is None and args.stds is None, "Means and Stds should not be provided but only calculated on train"
     # Assert split can't be based on subjects, if subject is not -1
-    assert not isinstance(args.split[0], list) or args.subject == -1, "Split based on subjects can only be done for all subjects"
+    assert not isinstance(args.split[0], list) or args.subject == [-1], "Split based on subjects can only be done for all subjects"
 
     # Splitting based on subjects
     if isinstance(args.split[0], list):
