@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from types import SimpleNamespace
 import mne
+import os
 import numpy as np
 import pandas as pd
 
@@ -22,7 +23,8 @@ parser = argparse.ArgumentParser(description='EEG-ImageNet Argument Parser')
 parser.add_argument('--dataset_dir', type=str, default='data/raw/EEG-ImageNet', help='Directory where the dataset is stored.')
 parser.add_argument('--spectrogram_dir', type=str, default='data/processed/EEG-ImageNet', help='Directory where the spectrograms are stored.')
 parser.add_argument('--figure_dir', type=str, default='figures/analysis/EEG-ImageNet', help='Directory for saving analysis figures.')
-parser.add_argument('--subject', type=int, default=-1,help='Subject index (-1 for all subjects).')
+parser.add_argument('--results_dir', type=str, default='results/EEG-ImageNet', help='Directory for saving analysis figures.')
+parser.add_argument('--subject', type=int, nargs='+', default=[-1], help='List of subject indices. Default is [-1] for all subjects.')
 parser.add_argument('--granularity', type=str, default='all',help='Granularity level for processing. Default is "all".')
 parser.add_argument('--image_generation_task', action='store_true', help='Flag to indicate if it is an image generation task.')
 parser.add_argument('--class_label', type=str, default=None, help='Class label for classification tasks. Default is None.')
@@ -45,9 +47,9 @@ parser.add_argument('--nperseg', type=int, default=200, help='nperseg parameter 
 parser.add_argument('--nfft', type=int, default=256, help='nfft parameter for spectrogram computation.')
 args = parser.parse_args()
 
-# python notebooks/eegImageNet/train_SVM.py --dataset_dir='data/raw/EEG-ImageNet' --spectrogram_dir='data/processed/EEG-ImageNet' --subject=1 --spectrograms --nperseg=100 --nfft=128
+# python notebooks/eegImageNet/train_SVM.py --dataset_dir='data/raw/EEG-ImageNet' --spectrogram_dir='data/processed/EEG-ImageNet' --subject=[1] --spectrograms --nperseg=100 --nfft=128
 
-for subject_idx in tqdm([-1]):
+for subject_idx in tqdm(args.subject):
     
     # Splitting based on subject 1
     loaders = get_loaders(args)
@@ -97,27 +99,25 @@ for subject_idx in tqdm([-1]):
 
     # Perform grid search for the RBF kernel
     grid_search_rbf = GridSearchCV(estimator=svm_rbf, param_grid=param_grid_rbf, cv=ps, scoring='accuracy', verbose=1, n_jobs=-1)
-    grid_search_rbf.fit(X_train, y_train)  # Fit on your training data
+    grid_search_rbf.fit(X_combined, y_combined)  # Fit on your training data
     # Extract the results into a DataFrame and save to a CSV file
     results_df = pd.DataFrame(grid_search_rbf.cv_results_)
-    results_df.to_csv(f'svm_rbf_grid_search_results_subject_{subject_idx}.csv', index=False)
+    os.makedirs(f'{args.results_dir}/grid_search_results/', exist_ok=True)
+    results_df.to_csv(f'{args.results_dir}/grid_search_results/svm_rbf_grid_search_results_subject_{subject_idx}.csv', index=False)
     # Get the best parameters and scores
     print(f"Best parameters for RBF kernel: {grid_search_rbf.best_params_}")
     print(f"Best accuracy for RBF kernel: {grid_search_rbf.best_score_}")
 
     # Perform grid search for the Linear kernel
     grid_search_linear = GridSearchCV(estimator=svm_linear, param_grid=param_grid_linear, cv=ps, scoring='accuracy', verbose=1, n_jobs=-1)
-    grid_search_linear.fit(X_train, y_train)  # Fit on your training data
+    grid_search_linear.fit(X_combined, y_combined)  # Fit on your training data
     # Extract the results into a DataFrame and save to a CSV file
     results_df = pd.DataFrame(grid_search_linear.cv_results_)
-    results_df.to_csv(f'svm_linear_grid_search_results_subject_{subject_idx}.csv', index=False)
+    results_df.to_csv(f'{args.results_dir}/grid_search_results/svm_linear_grid_search_results_subject_{subject_idx}.csv', index=False)
     # Get the best parameters and scores
     print(f"Best parameters for Linear kernel: {grid_search_linear.best_params_}")
     print(f"Best accuracy for Linear kernel: {grid_search_linear.best_score_}")
 
-    # Extract the results into a DataFrame and save to a CSV file
-    results_df = pd.DataFrame(grid_search_rbf.cv_results_)
-    results_df.to_csv(f'svm_rbf_grid_search_results_subject_{subject_idx}.csv', index=False)
 
     # Re-fit best model (depending on which kernel was best)
     best_svm = grid_search_rbf.best_estimator_ if grid_search_rbf.best_score_ > grid_search_linear.best_score_ else grid_search_linear.best_estimator_
@@ -133,7 +133,7 @@ for subject_idx in tqdm([-1]):
     print(f'Test Accuracy with tuned SVM: {test_accuracy * 100:.2f}%')
 
     # save params
-    with open(f'best_params_subject_{subject_idx}.txt', 'w') as f:
+    with open(f'{args.results_dir}/best_params_subject_{subject_idx}.txt', 'w') as f:
         f.write(f"Best parameters for RBF kernel: {grid_search_rbf.best_params_}\n")
         f.write(f"Best accuracy for RBF kernel: {grid_search_rbf.best_score_}\n")
         f.write(f"Best parameters for Linear kernel: {grid_search_linear.best_params_}\n")
@@ -159,6 +159,9 @@ for subject_idx in tqdm([-1]):
     plt.title(f'Subject {subject_idx} - Test Data - Acc: %.2f%%' % (test_accuracy * 100))
     plt.xlabel('Predicted Class')
     plt.ylabel('True Class')
-    plt.savefig(f'confusion_matrix_subject_{subject_idx}_optimized.png')
+
+    # create directory, then savefig: {args.figure_dir}/confusion_matrices/    
+    os.makedirs(f'{args.figure_dir}/confusion_matrices/', exist_ok=True)
+    plt.savefig(f'{args.figure_dir}/confusion_matrices/confusion_matrix_subject_{subject_idx}_optimized.png')
 
 
