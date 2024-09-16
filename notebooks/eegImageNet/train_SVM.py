@@ -45,9 +45,11 @@ parser.add_argument('--stds', type=float, nargs='+', default=None, help='Standar
 parser.add_argument('--indices', type=int, nargs='+', default=None, help='Indices for train/val/test split. If not provided, all data is used.')
 parser.add_argument('--nperseg', type=int, default=200, help='nperseg parameter for spectrogram computation.')
 parser.add_argument('--nfft', type=int, default=256, help='nfft parameter for spectrogram computation.')
+# num_workers
+parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for data loading. Default is 0.')
 args = parser.parse_args()
 
-# python notebooks/eegImageNet/train_SVM.py --dataset_dir='data/raw/EEG-ImageNet' --spectrogram_dir='data/processed/EEG-ImageNet' --subject=[1] --spectrograms --nperseg=100 --nfft=128
+# python notebooks/eegImageNet/train_SVM.py --dataset_dir='data/raw/EEG-ImageNet' --spectrogram_dir='data/processed/EEG-ImageNet' --subject=[1] --num_workers=8 --spectrograms --nperseg=100 --nfft=128
 
 for subject_idx in tqdm(args.subject):
     
