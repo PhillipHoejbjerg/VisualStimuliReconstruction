@@ -87,6 +87,8 @@ class EEGImageNetDataset(Dataset):
     
     def load_data(self):
 
+        print("Loading data for subjects: ", self.args.subject)
+
         # Load spectrograms if they're already created, if not they'll be created later
         if self.args.spectrograms and os.path.exists(f'{self.args.spectrogram_dir}/spectrograms_nperseg_{self.args.nperseg}.pth'):
             loaded = torch.load(os.path.join(self.args.spectrogram_dir, f"spectrograms_nperseg_{self.args.nperseg}.pth"))
