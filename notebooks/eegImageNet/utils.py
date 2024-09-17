@@ -258,9 +258,8 @@ def get_loaders(args):
     assert len(args.split) in [2, 3], "train/test/val split should be provided, or two test/val subjects for leave-one-out"
 
     assert args.means is None and args.stds is None, "Means and Stds should not be provided but only calculated on train"
-    
-    # if split has len 2, then subject has to be -1
-    assert len(args.split) == 3 or args.subject == -1, "If split is provided, subject should be -1"
+
+    assert len(args.split) == 3 or args.subject == [-1], "If Subject split is provided, subject should be -1"
 
     # Splitting based on percentages
     if sum(args.split) == 1 and len(args.split) == 3:
