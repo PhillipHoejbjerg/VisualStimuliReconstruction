@@ -255,43 +255,15 @@ def get_dataset(args):
 
 def get_loaders(args):
 
-    assert len(args.split) == 3, "Split must indicate train, test, and validation split"
+    assert len(args.split) in [2, 3], "train/test/val split should be provided, or two test/val subjects for leave-one-out"
 
-    # assert whether splits are either summing to 1 or are a list of ints
-    assert isinstance(args.split[0], list) or sum(args.split) == 1, "Split must either sum to 1 or be a list of subjects"
-    # assert args.means and args.stds are NOT provided
     assert args.means is None and args.stds is None, "Means and Stds should not be provided but only calculated on train"
-    # Assert split can't be based on subjects, if subject is not -1
-    assert not isinstance(args.split[0], list) or args.subject == [-1], "Split based on subjects can only be done for all subjects"
-
-    # Splitting based on subjects
-    if isinstance(args.split[0], list):
-
-        if args.spectrograms and not os.path.exists(f'{args.spectrogram_dir}/spectrograms_nperseg_{args.nperseg}.pth'):
-            print("Spectrograms are not computed yet, these will be computed on the full dataset")
-            
-            # If spectrograms don't exist, they'll be computed by loading the full dataset
-            data = get_dataset(args)
-            del data
-
-        # Load data per group
-        args.subject = args.split[0]
-        print("Loading Training data for subjects: ", args.subject)
-        train_dataset = get_dataset(args)
-
-        # Save means and stds for normalization
-        args.means, args.stds = train_dataset.args.means, train_dataset.args.stds
-
-        args.subject = args.split[1]
-        print("Loading Testing data for subjects: ", args.subject)
-        test_dataset = get_dataset(args)
-
-        args.subject = args.split[2]
-        print("Loading Validation data for subjects: ", args.subject)
-        val_dataset = get_dataset(args)
     
+    # if split has len 2, then subject has to be -1
+    assert len(args.split) == 3 or args.subject == -1, "If split is provided, subject should be -1"
+
     # Splitting based on percentages
-    elif sum(args.split) == 1:
+    if sum(args.split) == 1 and len(args.split) == 3:
         
         # Load all data
         data = get_dataset(args)
@@ -317,6 +289,34 @@ def get_loaders(args):
         print("Loading Validation data")
         val_dataset = get_dataset(args)
 
+
+    # Splitting based on subjects
+    # if len(args.split) == 2 and elements can be evaluated as integers .is_integer()
+    elif all(i.is_integer() for i in args.split):
+
+        if args.spectrograms and not os.path.exists(f'{args.spectrogram_dir}/spectrograms_nperseg_{args.nperseg}.pth'):
+            print("Spectrograms are not computed yet, these will be computed on the full dataset")
+            
+            # If spectrograms don't exist, they'll be computed by loading the full dataset
+            data = get_dataset(args)
+            del data
+
+        # Load data per group
+        args.subject = [subj for subj in all_subjects if subj not in args.split]
+        print("Loading Training data for subjects: ", args.subject)
+        train_dataset = get_dataset(args)
+
+        # Save means and stds for normalization
+        args.means, args.stds = train_dataset.args.means, train_dataset.args.stds
+
+        args.subject = args.split[1]
+        print("Loading Testing data for subjects: ", args.subject)
+        test_dataset = get_dataset(args)
+
+        args.subject = args.split[2]
+        print("Loading Validation data for subjects: ", args.subject)
+        val_dataset = get_dataset(args)
+    
     # Load into DataLoader
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)

@@ -30,6 +30,7 @@ parser.add_argument('--image_generation_task', action='store_true', help='Flag t
 parser.add_argument('--class_label', type=str, default=None, help='Class label for classification tasks. Default is None.')
 parser.add_argument('--split', type=float, nargs='+', default=[0.7, 0.15, 0.15],help='Data split ratios for train/val/test. Default is [0.7, 0.15, 0.15].')
 parser.add_argument('--batch_size', type=int, default=32, help='Batch size for data processing. Default is 32.')
+parser.add_argument('--cv', action='store_true', help='Flag to indicate whether to use cross-validation.')
 parser.add_argument('--seed', type=int, default=100, help='Random seed for reproducibility. Default is 100.')
 parser.add_argument('--spectrograms', action='store_true', help='Flag to indicate whether to use spectrograms.')
 parser.add_argument('--freq_bands', type=dict, default={
@@ -77,57 +78,60 @@ for subject_idx in tqdm(args.subject):
     X_combined = np.vstack((X_train, X_val))  # Stack the data vertically
     y_combined = np.hstack((y_train, y_val))  # Stack the labels horizontally
 
-    # Create an index that separates the training and validation sets
-    # -1 for training samples, 0 for validation samples
-    split_index = [-1] * len(X_train) + [0] * len(X_val)
 
-    # Use PredefinedSplit to specify the training and validation data
-    ps = PredefinedSplit(test_fold=split_index)
+    if args.cv:
 
-    # Define the parameter grid for the RBF kernel
-    param_grid_rbf = {
-        'C': [0.1, 1, 10, 100, 1000],  # Regularization parameter
-        'gamma': [1e-3, 1e-2, 1e-1, 'scale', 'auto'],  # Kernel coefficient for RBF
-    }
+        # Create an index that separates the training and validation sets
+        # -1 for training samples, 0 for validation samples
+        split_index = [-1] * len(X_train) + [0] * len(X_val)
 
-    # Define the parameter grid for the Linear kernel
-    param_grid_linear = {
-        'C': [0.1, 1, 10, 100, 1000],  # Regularization parameter for Linear kernel
-    }
+        # Use PredefinedSplit to specify the training and validation data
+        ps = PredefinedSplit(test_fold=split_index)
 
-    # Instantiate the SVM models
-    svm_rbf = SVC(kernel='rbf')
-    svm_linear = SVC(kernel='linear')
+        # Define the parameter grid for the RBF kernel
+        param_grid_rbf = {
+            'C': [0.1, 1, 10, 100, 1000],  # Regularization parameter
+            'gamma': [1e-3, 1e-2, 1e-1, 'scale', 'auto'],  # Kernel coefficient for RBF
+        }
 
-    # Perform grid search for the RBF kernel
-    grid_search_rbf = GridSearchCV(estimator=svm_rbf, param_grid=param_grid_rbf, cv=ps, scoring='accuracy', verbose=1, n_jobs=-1)
-    grid_search_rbf.fit(X_combined, y_combined)  # Fit on your training data
-    # Extract the results into a DataFrame and save to a CSV file
-    results_df = pd.DataFrame(grid_search_rbf.cv_results_)
-    os.makedirs(f'{args.results_dir}/grid_search_results/', exist_ok=True)
-    results_df.to_csv(f'{args.results_dir}/grid_search_results/svm_rbf_grid_search_results_subject_{subject_idx}.csv', index=False)
-    # Get the best parameters and scores
-    print(f"Best parameters for RBF kernel: {grid_search_rbf.best_params_}")
-    print(f"Best accuracy for RBF kernel: {grid_search_rbf.best_score_}")
+        # Define the parameter grid for the Linear kernel
+        param_grid_linear = {
+            'C': [0.1, 1, 10, 100, 1000],  # Regularization parameter for Linear kernel
+        }
 
-    # Perform grid search for the Linear kernel
-    grid_search_linear = GridSearchCV(estimator=svm_linear, param_grid=param_grid_linear, cv=ps, scoring='accuracy', verbose=1, n_jobs=-1)
-    grid_search_linear.fit(X_combined, y_combined)  # Fit on your training data
-    # Extract the results into a DataFrame and save to a CSV file
-    results_df = pd.DataFrame(grid_search_linear.cv_results_)
-    results_df.to_csv(f'{args.results_dir}/grid_search_results/svm_linear_grid_search_results_subject_{subject_idx}.csv', index=False)
-    # Get the best parameters and scores
-    print(f"Best parameters for Linear kernel: {grid_search_linear.best_params_}")
-    print(f"Best accuracy for Linear kernel: {grid_search_linear.best_score_}")
+        # Instantiate the SVM models
+        svm_rbf = SVC(kernel='rbf')
+        svm_linear = SVC(kernel='linear')
 
+        # Perform grid search for the RBF kernel
+        grid_search_rbf = GridSearchCV(estimator=svm_rbf, param_grid=param_grid_rbf, cv=ps, scoring='accuracy', verbose=1, n_jobs=-1)
+        grid_search_rbf.fit(X_combined, y_combined)  # Fit on your training data
+            
+        # Extract the results into a DataFrame and save to a CSV file
+        results_df = pd.DataFrame(grid_search_rbf.cv_results_)
+        os.makedirs(f'{args.results_dir}/grid_search_results/', exist_ok=True)
+        results_df.to_csv(f'{args.results_dir}/grid_search_results/svm_rbf_grid_search_results_subject_{subject_idx}.csv', index=False)
+        # Get the best parameters and scores
+        print(f"Best parameters for RBF kernel: {grid_search_rbf.best_params_}")
+        print(f"Best accuracy for RBF kernel: {grid_search_rbf.best_score_}")
 
-    # Re-fit best model (depending on which kernel was best)
-    best_svm = grid_search_rbf.best_estimator_ if grid_search_rbf.best_score_ > grid_search_linear.best_score_ else grid_search_linear.best_estimator_
+        # Perform grid search for the Linear kernel
+        grid_search_linear = GridSearchCV(estimator=svm_linear, param_grid=param_grid_linear, cv=ps, scoring='accuracy', verbose=1, n_jobs=-1)
+        grid_search_linear.fit(X_combined, y_combined)  # Fit on your training data
+        # Extract the results into a DataFrame and save to a CSV file
+        results_df = pd.DataFrame(grid_search_linear.cv_results_)
+        results_df.to_csv(f'{args.results_dir}/grid_search_results/svm_linear_grid_search_results_subject_{subject_idx}.csv', index=False)
+        # Get the best parameters and scores
+        print(f"Best parameters for Linear kernel: {grid_search_linear.best_params_}")
+        print(f"Best accuracy for Linear kernel: {grid_search_linear.best_score_}")
 
-    # Validate the retrained model on the validation data
-    y_val_pred = best_svm.predict(X_val)
-    val_accuracy = accuracy_score(y_val, y_val_pred)
-    print(f'Validation Accuracy with tuned SVM: {val_accuracy * 100:.2f}%')
+        # Re-fit best model (depending on which kernel was best)
+        best_svm = grid_search_rbf.best_estimator_ if grid_search_rbf.best_score_ > grid_search_linear.best_score_ else grid_search_linear.best_estimator_
+
+    else:
+        # train SVM linear, C=1
+        best_svm = SVC(kernel='linear', C=1)
+        best_svm.fit(X_combined, y_combined)
 
     # Test the model on the test data
     y_test_pred = best_svm.predict(X_test)
@@ -140,7 +144,6 @@ for subject_idx in tqdm(args.subject):
         f.write(f"Best accuracy for RBF kernel: {grid_search_rbf.best_score_}\n")
         f.write(f"Best parameters for Linear kernel: {grid_search_linear.best_params_}\n")
         f.write(f"Best accuracy for Linear kernel: {grid_search_linear.best_score_}\n")
-        f.write(f'Validation Accuracy with tuned SVM: {val_accuracy * 100:.2f}%\n')
         f.write(f'Test Accuracy with tuned SVM: {test_accuracy * 100:.2f}%')
 
     # Confusion matrix for test data
