@@ -300,6 +300,7 @@ def get_loaders(args):
             data = get_dataset(args)
             del data
 
+        all_subjects = list(range(0,16))
         # Load data per group
         args.subject = [subj for subj in all_subjects if subj not in args.split]
         print("Loading Training data for subjects: ", args.subject)
@@ -308,13 +309,13 @@ def get_loaders(args):
         # Save means and stds for normalization
         args.means, args.stds = train_dataset.args.means, train_dataset.args.stds
 
+        args.subject = args.split[0]
+        print("Loading Validation data for subjects: ", args.subject)
+        val_dataset = get_dataset(args)
+
         args.subject = args.split[1]
         print("Loading Testing data for subjects: ", args.subject)
         test_dataset = get_dataset(args)
-
-        args.subject = args.split[2]
-        print("Loading Validation data for subjects: ", args.subject)
-        val_dataset = get_dataset(args)
     
     # Load into DataLoader
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)

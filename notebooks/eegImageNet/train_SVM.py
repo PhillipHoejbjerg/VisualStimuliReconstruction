@@ -28,7 +28,7 @@ parser.add_argument('--subject', type=int, nargs='+', default=[-1], help='List o
 parser.add_argument('--granularity', type=str, default='all',help='Granularity level for processing. Default is "all".')
 parser.add_argument('--image_generation_task', action='store_true', help='Flag to indicate if it is an image generation task.')
 parser.add_argument('--class_label', type=str, default=None, help='Class label for classification tasks. Default is None.')
-parser.add_argument('--split', type=float, nargs='+', default=[0.7, 0.15, 0.15],help='Data split ratios for train/val/test. Default is [0.7, 0.15, 0.15].')
+parser.add_argument('--split', type=float, nargs='+', default=[0.7, 0.15, 0.15],help='Data split ratios for train/val/test. If two integers they correspond to val/test subjects.')
 parser.add_argument('--batch_size', type=int, default=32, help='Batch size for data processing. Default is 32.')
 parser.add_argument('--cv', action='store_true', help='Flag to indicate whether to use cross-validation.')
 parser.add_argument('--seed', type=int, default=100, help='Random seed for reproducibility. Default is 100.')
@@ -74,18 +74,13 @@ for subject_idx in tqdm(args.subject):
     print(f"Val: {X_val.shape}, {y_val.shape}")
     print(f"Test: {X_test.shape}, {y_test.shape}")
 
-    # Combine training and validation sets
-    X_combined = np.vstack((X_train, X_val))  # Stack the data vertically
-    y_combined = np.hstack((y_train, y_val))  # Stack the labels horizontally
-
 
     if args.cv:
 
-        # Create an index that separates the training and validation sets
-        # -1 for training samples, 0 for validation samples
+        # Combine training and validation sets for cross-validation
+        X_combined = np.vstack((X_train, X_val))  # Stack the data vertically
+        y_combined = np.hstack((y_train, y_val))  # Stack the labels horizontally
         split_index = [-1] * len(X_train) + [0] * len(X_val)
-
-        # Use PredefinedSplit to specify the training and validation data
         ps = PredefinedSplit(test_fold=split_index)
 
         # Define the parameter grid for the RBF kernel
@@ -127,46 +122,45 @@ for subject_idx in tqdm(args.subject):
 
         # Re-fit best model (depending on which kernel was best)
         best_svm = grid_search_rbf.best_estimator_ if grid_search_rbf.best_score_ > grid_search_linear.best_score_ else grid_search_linear.best_estimator_
+        best_svm.fit(X_train, y_train)
+
+        # save params
+        with open(f'{args.results_dir}/CV_best_params_subject_{subject_idx}.txt', 'w') as f:
+            f.write(f"Best parameters for RBF kernel: {grid_search_rbf.best_params_}\n")
+            f.write(f"Best accuracy for RBF kernel: {grid_search_rbf.best_score_}\n")
+            f.write(f"Best parameters for Linear kernel: {grid_search_linear.best_params_}\n")
+            f.write(f"Best accuracy for Linear kernel: {grid_search_linear.best_score_}\n")
 
     else:
         # train SVM linear, C=1
         best_svm = SVC(kernel='linear', C=1)
-        best_svm.fit(X_combined, y_combined)
+        best_svm.fit(X_train, y_train)
 
-    # Test the model on the test data
-    y_test_pred = best_svm.predict(X_test)
-    test_accuracy = accuracy_score(y_test, y_test_pred)
-    print(f'Test Accuracy with tuned SVM: {test_accuracy * 100:.2f}%')
-
-    # save params
-    with open(f'{args.results_dir}/best_params_subject_{subject_idx}.txt', 'w') as f:
-        f.write(f"Best parameters for RBF kernel: {grid_search_rbf.best_params_}\n")
-        f.write(f"Best accuracy for RBF kernel: {grid_search_rbf.best_score_}\n")
-        f.write(f"Best parameters for Linear kernel: {grid_search_linear.best_params_}\n")
-        f.write(f"Best accuracy for Linear kernel: {grid_search_linear.best_score_}\n")
-        f.write(f'Test Accuracy with tuned SVM: {test_accuracy * 100:.2f}%')
-
-    # Confusion matrix for test data
-    conf_matrix = confusion_matrix(y_test, y_test_pred, normalize='true')
-
-    # Get class labels (assuming label2class mapping is available)
-    class_labels = [loaders['train'].dataset.label2class[label][0] for label in loaders['train'].dataset.idx2label.values()]
-
-    # Plot the confusion matrix
-    plt.figure(figsize=(20, 16))
-    sns.heatmap(conf_matrix, annot=False, fmt='d', cmap='Blues', 
-                xticklabels=class_labels, yticklabels=class_labels)
-
-    # Rotate x-axis labels vertically and reduce font size
-    plt.xticks(rotation=90, fontsize=12)  # Adjust fontsize for x-axis
-    plt.yticks(rotation=0, fontsize=12)   # Adjust fontsize for y-axis
-
-    plt.title(f'Subject {subject_idx} - Test Data - Acc: %.2f%%' % (test_accuracy * 100))
-    plt.xlabel('Predicted Class')
-    plt.ylabel('True Class')
-
-    # create directory, then savefig: {args.figure_dir}/confusion_matrices/    
+    # Confusion matrices
     os.makedirs(f'{args.figure_dir}/confusion_matrices/', exist_ok=True)
-    plt.savefig(f'{args.figure_dir}/confusion_matrices/confusion_matrix_subject_{subject_idx}_optimized.png')
+    for i, (dataset_str, features, targets) in enumerate([('Val', X_val, y_val), ('Test', X_test, y_test)]):
 
+        # Test and val accuracies
+        targets_pred = best_svm.predict(features)
+        accuracy = accuracy_score(targets, targets_pred)
+        print(f'{dataset_str} Accuracy with tuned SVM: {accuracy * 100:.2f}%')
 
+        class_labels = [loaders['train'].dataset.label2class[label][0] for label in loaders['train'].dataset.idx2label.values()]
+        conf_matrix = confusion_matrix(targets, targets_pred, normalize='true')
+        # Plot the confusion matrix
+        plt.figure(figsize=(20, 16))
+        sns.heatmap(conf_matrix, annot=False, fmt='d', cmap='Blues', 
+                    xticklabels=class_labels, yticklabels=class_labels)
+        # Rotate x-axis labels vertically and reduce font size
+        plt.xticks(rotation=90, fontsize=12)
+        plt.yticks(rotation=0, fontsize=12)   # Adjust fontsize for y-axis
+        plt.xlabel('Predicted Class')
+        plt.ylabel('True Class')
+
+        if all(i.is_integer() for i in args.split): # i.e. leave one subject out
+            plt.title(f'LOO - Subject {args.split[i]} - Acc: %.2f%%' % (accuracy * 100))
+            plt.savefig(f'{args.figure_dir}/confusion_matrices/LOO_Subject_{args.split[i]}.png')
+            
+        else:# regular test splits
+            plt.title(f'{dataset_str} - Subject {subject_idx} - Acc: %.2f%%' % (accuracy * 100))
+            plt.savefig(f'{args.figure_dir}/confusion_matrices/{dataset_str}_subject_{subject_idx}.png')
