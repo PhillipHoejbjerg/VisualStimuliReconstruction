@@ -291,7 +291,7 @@ def get_loaders(args):
 
     # Splitting based on subjects
     # if len(args.split) == 2 and elements can be evaluated as integers .is_integer()
-    elif all(i.is_integer() for i in args.split):
+    elif all(float(i).is_integer() for i in args.split):
 
         if args.spectrograms and not os.path.exists(f'{args.spectrogram_dir}/spectrograms_nperseg_{args.nperseg}.pth'):
             print("Spectrograms are not computed yet, these will be computed on the full dataset")
