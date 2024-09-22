@@ -87,6 +87,9 @@ class EEGImageNetDataset(Dataset):
     
     def load_data(self):
 
+        if isinstance(self.args.subject, int) or isinstance(self.args.subject, float):
+            self.args.subject = [int(self.args.subject)]
+
         print("Loading data for subjects: ", self.args.subject)
 
         # Load spectrograms if they're already created, if not they'll be created later
@@ -104,8 +107,6 @@ class EEGImageNetDataset(Dataset):
 
         # Filter by subject
         if self.args.subject != [-1]:
-            if isinstance(self.args.subject, int):
-                self.args.subject = [self.args.subject]
 
             loaded['dataset'] = [loaded['dataset'][i] for i in range(len(loaded['dataset'])) if
                            loaded['dataset'][i]['subject'] in self.args.subject]
